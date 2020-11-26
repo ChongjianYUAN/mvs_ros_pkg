@@ -16,23 +16,9 @@ unsigned int g_nPayloadSize = 0;
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "grab");
-  ros::NodeHandle n;
-  // printf("%d\n", CV_8UC3);
-  // cv::Mat image = cv::imread("/home/dji/a.jpg", cv::IMREAD_COLOR);
-  // cv::FileStorage fs("m.xml", cv::FileStorage::READ);
-  // cv::Mat image;
-  // fs["nn"] >> image;
-  // if(image.empty())
-  // {
-  //     printf("Open Error\n");
-  // }
-  // cv::imshow("a", image);
-  // cv::waitKey(0);
-  // cv::destroyWindow("a");
-  // cv::FileStorage fs("m.xml", cv::FileStorage::WRITE);
-  // fs << "nn" << image;
-  // fs.release();
-
+  ros::NodeHandle nh;
+  image_transport::ImageTransport it(nh);
+  image_transport::Publisher pub = it.advertise("mvs_camera/image", 1);
   cv::Mat cameraMatrix = cv::Mat::eye(3, 3, CV_64F);
   cameraMatrix.at<double>(0, 0) = 1.730735067136013e+03;
   cameraMatrix.at<double>(0, 1) = -0.000682525720977;
@@ -49,8 +35,8 @@ int main(int argc, char **argv) {
 
   int nRet = MV_OK;
   void *handle = NULL;
-
-  while (1) {
+  ros::Rate loop_rate(10);
+  while (ros::ok()) {
     MV_CC_DEVICE_INFO_LIST stDeviceList;
     memset(&stDeviceList, 0, sizeof(MV_CC_DEVICE_INFO_LIST));
     nRet = MV_CC_EnumDevices(MV_GIGE_DEVICE | MV_USB_DEVICE, &stDeviceList);
@@ -91,7 +77,7 @@ int main(int argc, char **argv) {
 
     nRet = MV_CC_SetFloatValue(handle, "Gain", 18);
     if (nRet != MV_OK) {
-      printf("Gain setting can't work.");
+      printf("Gain setting can't work.\n");
       // break;
     }
 
@@ -126,15 +112,14 @@ int main(int argc, char **argv) {
     MV_FRAME_OUT_INFO_EX stImageInfo = {0};
     unsigned char *pData =
         (unsigned char *)malloc(sizeof(unsigned char) * (g_nPayloadSize));
-    cv::namedWindow("camera", CV_WINDOW_KEEPRATIO);
-    cv::namedWindow("camera2", CV_WINDOW_KEEPRATIO);
+    // cv::namedWindow("camera", CV_WINDOW_KEEPRATIO);
+    // cv::namedWindow("camera2", CV_WINDOW_KEEPRATIO);
 
-    cout << "Give a headname" << endl;
-    string name;
-    cin >> name;
-    name = "/home/dji/catkin_ws/src/opencv_exercise/pic/" + name;
+    // cout << "Give a headname" << endl;
+    // string name;
+    // cin >> name;
+    // name = "/home/dji/catkin_ws/src/opencv_exercise/pic/" + name;
     // cv::FileStorage fs(name, cv::FileStorage::WRITE);
-    int count = 0;
 
     nRet =
         MV_CC_GetImageForBGR(handle, pData, g_nPayloadSize, &stImageInfo, 100);
@@ -144,6 +129,9 @@ int main(int argc, char **argv) {
       pData = NULL;
       break;
     }
+
+    ROS_INFO("Open camera sucessfully!");
+
     cv::Size imageSize;
     imageSize.height = stImageInfo.nHeight;
     imageSize.width = stImageInfo.nWidth;
@@ -155,7 +143,7 @@ int main(int argc, char **argv) {
                                       imageSize, 0),
         imageSize, CV_16SC2, map1, map2);
 
-    while (1) {
+    while (ros::ok()) {
       memset(&stImageInfo, 0, sizeof(MV_FRAME_OUT_INFO_EX));
       if (pData == NULL) {
         printf("Allocate memory failed.\n");
@@ -174,30 +162,22 @@ int main(int argc, char **argv) {
       cv::Mat srcImage, calibration;
       srcImage =
           cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, pData);
-
-      if (is_undistorted) {
-        imshow("camera", srcImage);
-        remap(srcImage, srcImage, map1, map2, cv::INTER_LINEAR);
-        imshow("camera2", srcImage);
-      } else {
-        cv::imshow("camera", srcImage);
-      }
-
-      unsigned char c = cvWaitKey(50);
-      if (c == 'q') {
-        break;
-      } else if (c == 's') {
-        // fs << ("n" + to_string(count)) << srcImage;
-        if (cvWaitKey(0) == 's') {
-          cv::imwrite(name + std::to_string(count) + ".bmp", srcImage);
-          count++;
-        }
-      }
+      sensor_msgs::ImagePtr msg =
+          cv_bridge::CvImage(std_msgs::Header(), "bgr8", srcImage).toImageMsg();
+      pub.publish(msg);
+      ros::spinOnce();
+      loop_rate.sleep();
+      //   if (is_undistorted) {
+      //     imshow("camera", srcImage);
+      //     remap(srcImage, srcImage, map1, map2, cv::INTER_LINEAR);
+      //     imshow("camera2", srcImage);
+      //   } else {
+      //     cv::imshow("camera", srcImage);
+      //   }
 
       srcImage.release();
     }
     // fs.release();
-    cv::destroyWindow("window");
     free(pData);
     nRet = MV_CC_StopGrabbing(handle);
     nRet = MV_CC_CloseDevice(handle);

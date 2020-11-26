@@ -6,12 +6,17 @@ add_compile_options(-std=c++11)
 
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
+  image_transport
   roscpp
   rospy
   sensor_msgs
   std_msgs
 )
 find_package(OpenCV)
+
+catkin_package(
+ CATKIN_DEPENDS roscpp rospy std_msgs
+)
 
 include_directories(
   include

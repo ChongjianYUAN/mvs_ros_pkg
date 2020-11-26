@@ -1,0 +1,9 @@
+<launch>
+  <node 
+    pkg="mvs_ros_pkg"
+    type="grabImg"
+    name="mvs_camera"
+    respawn="true"
+    output="screen"
+  />
+</launch>
