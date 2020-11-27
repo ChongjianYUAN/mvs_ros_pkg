@@ -11,11 +11,66 @@
 using namespace std;
 
 bool is_undistorted = true;
-
 unsigned int g_nPayloadSize = 0;
+std::string ExposureAutoStr[3] = {"Off", "Once", "Continues"};
+std::string GainAutoStr[3] = {"Off", "Once", "Continues"};
+
+void setParams(void *handle, const std::string &params_file) {
+  cv::FileStorage Params(params_file, cv::FileStorage::READ);
+  if (!Params.isOpened()) {
+    string msg = "Failed to open settings file at:" + params_file;
+    ROS_ERROR(msg.c_str());
+    exit(-1);
+  }
+  int ExposureAuto = Params["ExposureAuto"];
+  int ExposureTimeLower = Params["AutoExposureTimeLower"];
+  int ExposureTimeUpper = Params["AutoExposureTimeUpper"];
+  int GainAuto = Params["GainAuto"];
+  int GammaSelector = Params["GammaSelector"];
+  float FrameRate = Params["FrameRate"];
+  int nRet;
+  nRet = MV_CC_SetEnumValue(handle, "ExposureAuto", ExposureAuto);
+  if (MV_OK == nRet) {
+    std::string msg = "Set Exposure Auto: " + ExposureAutoStr[ExposureAuto];
+    ROS_INFO(msg.c_str());
+  } else {
+    ROS_ERROR("Fail to set Exposure auto mode");
+  }
+  nRet = MV_CC_SetAutoExposureTimeLower(handle, ExposureTimeLower);
+  if (MV_OK == nRet) {
+    std::string msg =
+        "Set Exposure Time Lower: " + std::to_string(ExposureTimeLower) + "ms";
+    ROS_INFO(msg.c_str());
+  } else {
+    ROS_ERROR("Fail to set Exposure Time Lower");
+  }
+  nRet = MV_CC_SetAutoExposureTimeUpper(handle, ExposureTimeUpper);
+  if (MV_OK == nRet) {
+    std::string msg =
+        "Set Exposure Time Upper: " + std::to_string(ExposureTimeUpper) + "ms";
+    ROS_INFO(msg.c_str());
+  } else {
+    ROS_ERROR("Fail to set Exposure Time Upper");
+  }
+  nRet = MV_CC_SetEnumValue(handle, "GainAuto", GainAuto);
+  if (MV_OK == nRet) {
+    std::string msg = "Set Gain Auto: " + GainAutoStr[GainAuto];
+    ROS_INFO(msg.c_str());
+  } else {
+    ROS_ERROR("Fail to set Gain auto mode");
+  }
+  nRet = MV_CC_SetFrameRate(handle, FrameRate);
+  if (MV_OK == nRet) {
+    std::string msg = "Set Frame Rate: " + std::to_string(FrameRate) + "hz";
+    ROS_INFO(msg.c_str());
+  } else {
+    ROS_ERROR("Fail to set Frame Rate");
+  }
+}
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "grab");
+  std::string params_file = std::string(argv[1]);
   ros::NodeHandle nh;
   image_transport::ImageTransport it(nh);
   image_transport::Publisher pub = it.advertise("mvs_camera/image", 1);
@@ -68,13 +123,6 @@ int main(int argc, char **argv) {
       break;
     }
 
-    // nRet = MV_CC_SetIntValue(handle, "GainAuto", 2);
-    // if(nRet != MV_OK)
-    // {
-    //     // printf("Gain setting can't work.");
-    //     // break;
-    // }
-
     nRet = MV_CC_SetFloatValue(handle, "Gain", 18);
     if (nRet != MV_OK) {
       printf("Gain setting can't work.\n");
@@ -102,6 +150,8 @@ int main(int argc, char **argv) {
       printf("Pixel setting can't work.");
       break;
     }
+
+    setParams(handle, params_file);
 
     nRet = MV_CC_StartGrabbing(handle);
     if (MV_OK != nRet) {
