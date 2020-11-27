@@ -31,7 +31,7 @@ link_directories(
 
 add_executable(grabImg src/grab.cpp)
 add_executable(grabImgWithTrigger src/grab.cpp)
-add_executable(setParam src/SetParam.cpp)
+add_executable(Trigger_Image src/Trigger_Image.cpp)
 
 target_link_libraries(
   grabImg
@@ -47,10 +47,11 @@ target_link_libraries(
   -lMvCameraControl
   -lpthread
 )
+
 target_link_libraries(
-  setParam
+  Trigger_Image
   ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
   -lMvCameraControl
+  -lpthread
 )
-
-
