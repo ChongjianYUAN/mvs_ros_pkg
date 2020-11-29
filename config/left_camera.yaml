@@ -4,6 +4,11 @@
 # Camera Parameters. Adjust them!
 #--------------------------------------------------------------------------------------------
 
+SerialNumber: "00F00964437"
+
+# Ros topic name
+TopicName: "left_camera/image"
+
 # Exposure Auto, 0 stands for Off, 1 stands for Once, 2 stands for Continues
 ExposureAuto: 2
 AutoExposureTimeLower: 65
@@ -16,5 +21,4 @@ GammaSelector: 1
 
 # Frame Rate
 FrameRate: 10.0
-
 
