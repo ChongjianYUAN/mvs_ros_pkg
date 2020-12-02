@@ -30,7 +30,7 @@ link_directories(
 )
 
 add_executable(grabImg src/grab.cpp)
-add_executable(grabImgWithTrigger src/grab.cpp)
+add_executable(grabImgWithTrigger src/grab_trigger.cpp)
 add_executable(Trigger_Image src/Trigger_Image.cpp)
 
 target_link_libraries(

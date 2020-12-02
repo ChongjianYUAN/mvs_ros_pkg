@@ -10,119 +10,173 @@
 using namespace std;
 
 unsigned int g_nPayloadSize = 0;
-bool exit_flag = true;
-uint64_t strobe_time = 0;
-image_transport::Publisher pub_opencv;
+bool is_undistorted = true;
+bool exit_flag = false;
+image_transport::Publisher pub;
+std::string ExposureAutoStr[3] = {"Off", "Once", "Continues"};
+std::string GainAutoStr[3] = {"Off", "Once", "Continues"};
 
-void strobeCbk(const std_msgs::Header::ConstPtr &msg) {
-  // printf("----%.9lf------\n", msg->stamp.toSec());
-  strobe_time = msg->stamp.toNSec();
+void setParams(void *handle, const std::string &params_file) {
+  cv::FileStorage Params(params_file, cv::FileStorage::READ);
+  if (!Params.isOpened()) {
+    string msg = "Failed to open settings file at:" + params_file;
+    ROS_ERROR_STREAM(msg.c_str());
+    exit(-1);
+  }
+  int ExposureAuto = Params["ExposureAuto"];
+  int ExposureTimeLower = Params["AutoExposureTimeLower"];
+  int ExposureTimeUpper = Params["AutoExposureTimeUpper"];
+  int GainAuto = Params["GainAuto"];
+  int GammaSelector = Params["GammaSelector"];
+  int nRet;
+  nRet = MV_CC_SetEnumValue(handle, "ExposureAuto", ExposureAuto);
+  if (MV_OK == nRet) {
+    std::string msg = "Set Exposure Auto: " + ExposureAutoStr[ExposureAuto];
+    ROS_INFO_STREAM(msg.c_str());
+  } else {
+    ROS_ERROR_STREAM("Fail to set Exposure auto mode");
+  }
+  nRet = MV_CC_SetAutoExposureTimeLower(handle, ExposureTimeLower);
+  if (MV_OK == nRet) {
+    std::string msg =
+        "Set Exposure Time Lower: " + std::to_string(ExposureTimeLower) + "ms";
+    ROS_INFO_STREAM(msg.c_str());
+  } else {
+    ROS_ERROR_STREAM("Fail to set Exposure Time Lower");
+  }
+  nRet = MV_CC_SetAutoExposureTimeUpper(handle, ExposureTimeUpper);
+  if (MV_OK == nRet) {
+    std::string msg =
+        "Set Exposure Time Upper: " + std::to_string(ExposureTimeUpper) + "ms";
+    ROS_INFO_STREAM(msg.c_str());
+  } else {
+    ROS_ERROR_STREAM("Fail to set Exposure Time Upper");
+  }
+  nRet = MV_CC_SetEnumValue(handle, "GainAuto", GainAuto);
+  if (MV_OK == nRet) {
+    std::string msg = "Set Gain Auto: " + GainAutoStr[GainAuto];
+    ROS_INFO_STREAM(msg.c_str());
+  } else {
+    ROS_ERROR_STREAM("Fail to set Gain auto mode");
+  }
 }
 
-void __stdcall ImageCallBackEx(unsigned char *pData,
-                               MV_FRAME_OUT_INFO_EX *pFrameInfo, void *pUser) {
-  static uint last_cnt = pFrameInfo->nTriggerIndex;
-  static uint64_t cur_strobe = strobe_time;
-  static uint64_t cur_framehead =
-      (((uint64_t)pFrameInfo->nDevTimeStampHigh << 32) |
-       (pFrameInfo->nDevTimeStampLow));
-
-  if (last_cnt != pFrameInfo->nTriggerIndex) {
-    cur_strobe = strobe_time + 1e9;
-    cur_framehead = (((uint64_t)pFrameInfo->nDevTimeStampHigh << 32) |
-                     (pFrameInfo->nDevTimeStampLow));
-  }
-  // printf("%.9lf\n", (cur_strobe +
-  // (((uint64_t)pFrameInfo->nDevTimeStampHigh<<32) |
-  // (pFrameInfo->nDevTimeStampLow)) - cur_framehead)/1000000000.0 );
-  uint64_t frame_time =
-      (cur_strobe + (((uint64_t)pFrameInfo->nDevTimeStampHigh << 32) |
-                     (pFrameInfo->nDevTimeStampLow)) -
-       cur_framehead);
-  last_cnt = pFrameInfo->nTriggerIndex;
-
-  cv::Mat srcImage;
-
-  unsigned int nWidth = pFrameInfo->nWidth;
-  unsigned int nHeight = pFrameInfo->nHeight;
-  for (unsigned int j = 0; j < nHeight; j++) {
-    for (unsigned int i = 0; i < nWidth; i++) {
-      unsigned char red = pData[j * (nWidth * 3) + i * 3];
-      pData[j * (nWidth * 3) + i * 3] = pData[j * (nWidth * 3) + i * 3 + 2];
-      pData[j * (nWidth * 3) + i * 3 + 2] = red;
-    }
-  }
-
-  srcImage = cv::Mat(nHeight, nWidth, CV_8UC3, pData);
-  sensor_msgs::ImagePtr msg =
-      cv_bridge::CvImage(std_msgs::Header(), "bgr8", srcImage).toImageMsg();
-
-  msg->header.stamp.nsec = frame_time % 1000000000;
-  msg->header.stamp.sec = frame_time / 1000000000;
-  msg->header.frame_id = "camera_init";
-  pub_opencv.publish(msg);
-
-  // if(pFrameInfo)
-  // {
-  //   printf("GetOneFrame, frame num[%d] trigger cnt[%d] dev[%lu]
-  //   time[%u][%u][%u]\n",
-  //         pFrameInfo->nFrameNum, pFrameInfo->nTriggerIndex,
-  //         (((uint64_t)pFrameInfo->nDevTimeStampHigh<<32) |
-  //         (pFrameInfo->nDevTimeStampLow)),
-  //         pFrameInfo->nSecondCount, pFrameInfo->nCycleCount,
-  //         pFrameInfo->nCycleOffset);
-  // }
+void PressEnterToExit(void) {
+  int c;
+  while ((c = getchar()) != '\n' && c != EOF)
+    ;
+  fprintf(stderr, "\nPress enter to exit.\n");
+  while (getchar() != '\n')
+    ;
+  exit_flag = true;
+  sleep(1);
 }
 
 static void *WorkThread(void *pUser) {
-  while (exit_flag) {
+  int nRet = MV_OK;
+
+  // ch:获取数据包大小 | en:Get payload size
+  MVCC_INTVALUE stParam;
+  memset(&stParam, 0, sizeof(MVCC_INTVALUE));
+  nRet = MV_CC_GetIntValue(pUser, "PayloadSize", &stParam);
+  if (MV_OK != nRet) {
+    printf("Get PayloadSize fail! nRet [0x%x]\n", nRet);
+    return NULL;
   }
 
-  return NULL;
+  MV_FRAME_OUT_INFO_EX stImageInfo = {0};
+  memset(&stImageInfo, 0, sizeof(MV_FRAME_OUT_INFO_EX));
+  unsigned char *pData =
+      (unsigned char *)malloc(sizeof(unsigned char) * stParam.nCurValue);
+  if (NULL == pData)
+    return NULL;
+
+  unsigned int nDataSize = stParam.nCurValue;
+
+  while (ros::ok()) {
+
+    nRet =
+        MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 1000);
+    if (nRet == MV_OK) {
+      printf("GetOneFrame, Width[%d], Height[%d], nFrameNum[%d]\n",
+             stImageInfo.nWidth, stImageInfo.nHeight, stImageInfo.nFrameNum);
+      cv::Mat srcImage;
+      srcImage =
+          cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, pData);
+      sensor_msgs::ImagePtr msg =
+          cv_bridge::CvImage(std_msgs::Header(), "bgr8", srcImage).toImageMsg();
+      pub.publish(msg);
+    }
+
+    if (exit_flag)
+      break;
+  }
+
+  if (pData) {
+    free(pData);
+    pData = NULL;
+  }
+
+  return 0;
 }
 
 int main(int argc, char **argv) {
-  ros::init(argc, argv, "grab_trigger");
-  ros::NodeHandle n;
-  ros::Subscriber sub_strobe = n.subscribe("/strobe_time", 1000, strobeCbk);
-  image_transport::ImageTransport it(n);
-  pub_opencv = it.advertise("strobe_image", 1);
-
-  cv::Mat cameraMatrix = cv::Mat::eye(3, 3, CV_64F);
-  cameraMatrix.at<double>(0, 0) = 1.730735067136013e+03;
-  cameraMatrix.at<double>(0, 1) = -0.000682525720977;
-  cameraMatrix.at<double>(0, 2) = 1.515012142085100e+03;
-  cameraMatrix.at<double>(1, 1) = 1.730530820356212e+03;
-  cameraMatrix.at<double>(1, 2) = 1.044575428820981e+03;
-
-  cv::Mat distCoeffs = cv::Mat::zeros(5, 1, CV_64F);
-  distCoeffs.at<double>(0, 0) = -0.095982349277083;
-  distCoeffs.at<double>(1, 0) = 0.090204555257461;
-  distCoeffs.at<double>(2, 0) = 0.001075320356832;
-  distCoeffs.at<double>(3, 0) = -0.001243809361172;
-  distCoeffs.at<double>(4, 0) = 0;
-
+  ros::init(argc, argv, "mvs_trigger");
+  std::string params_file = std::string(argv[1]);
+  ros::NodeHandle nh;
+  image_transport::ImageTransport it(nh);
   int nRet = MV_OK;
   void *handle = NULL;
+  ros::Rate loop_rate(10);
+  cv::FileStorage Params(params_file, cv::FileStorage::READ);
+  if (!Params.isOpened()) {
+    string msg = "Failed to open settings file at:" + params_file;
+    ROS_ERROR_STREAM(msg.c_str());
+    exit(-1);
+  }
+  std::string expect_serial_number = Params["SerialNumber"];
+  std::string pub_topic = Params["TopicName"];
+  pub = it.advertise(pub_topic, 1);
 
-  while (1) {
+  while (ros::ok()) {
     MV_CC_DEVICE_INFO_LIST stDeviceList;
     memset(&stDeviceList, 0, sizeof(MV_CC_DEVICE_INFO_LIST));
-
+    // 枚举检测到的相机数量
     nRet = MV_CC_EnumDevices(MV_GIGE_DEVICE | MV_USB_DEVICE, &stDeviceList);
     if (MV_OK != nRet) {
       printf("Enum Devices fail!");
       break;
     }
 
+    bool find_expect_camera = false;
+    int expect_camera_index = 0;
     if (stDeviceList.nDeviceNum == 0) {
-      printf("No Camera.\n");
+      ROS_ERROR_STREAM("No Camera.\n");
+      break;
+    } else {
+      // 根据serial number启动指定相机
+      for (int i = 0; i < stDeviceList.nDeviceNum; i++) {
+        std::string serial_number =
+            std::string((char *)stDeviceList.pDeviceInfo[i]
+                            ->SpecialInfo.stUsb3VInfo.chSerialNumber);
+        if (expect_serial_number == serial_number) {
+          find_expect_camera = true;
+          expect_camera_index = i;
+          break;
+        }
+      }
+    }
+    if (!find_expect_camera) {
+      std::string msg =
+          "Can not find the camera with serial number " + expect_serial_number;
+      ROS_ERROR_STREAM(msg.c_str());
       break;
     }
 
-    nRet = MV_CC_CreateHandle(&handle, stDeviceList.pDeviceInfo[0]);
+    nRet = MV_CC_CreateHandle(&handle,
+                              stDeviceList.pDeviceInfo[expect_camera_index]);
     if (MV_OK != nRet) {
-      printf("Create Handle fail");
+      ROS_ERROR_STREAM("Create Handle fail");
       break;
     }
 
@@ -153,12 +207,25 @@ int main(int argc, char **argv) {
       break;
     }
 
-    nRet = MV_CC_RegisterImageCallBackEx(handle, ImageCallBackEx, handle);
+    setParams(handle, params_file);
+
+    // 设置触发模式为on
+    // set trigger mode as on
+    nRet = MV_CC_SetEnumValue(handle, "TriggerMode", 1);
     if (MV_OK != nRet) {
-      printf("MV_CC_RegisterImageCallBackEx fail! nRet [%x]\n", nRet);
+      printf("MV_CC_SetTriggerMode fail! nRet [%x]\n", nRet);
       break;
     }
 
+    // 设置触发源
+    // set trigger source
+    nRet = MV_CC_SetEnumValue(handle, "TriggerSource", MV_TRIGGER_SOURCE_LINE0);
+    if (MV_OK != nRet) {
+      printf("MV_CC_SetTriggerSource fail! nRet [%x]\n", nRet);
+      break;
+    }
+
+    ROS_INFO("Finish all params set! Start grabbing...");
     nRet = MV_CC_StartGrabbing(handle);
     if (MV_OK != nRet) {
       printf("Start Grabbing fail.\n");
@@ -171,8 +238,8 @@ int main(int argc, char **argv) {
       printf("thread create failed.ret = %d\n", nRet);
       break;
     }
-    ros::spin();
-    exit_flag = false;
+
+    PressEnterToExit();
 
     nRet = MV_CC_StopGrabbing(handle);
     if (MV_OK != nRet) {
@@ -194,13 +261,5 @@ int main(int argc, char **argv) {
 
     break;
   }
-
-  if (nRet != MV_OK) {
-    if (handle != NULL) {
-      MV_CC_DestroyHandle(handle);
-      handle = NULL;
-    }
-  }
-  pub_opencv.shutdown();
   return 0;
 }

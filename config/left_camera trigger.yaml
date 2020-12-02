@@ -19,7 +19,4 @@ GainAuto: 2
 # Gamma Selector, 0 stands for user, 1 stands for sRGB
 GammaSelector: 1
 
-# Frame Rate (if trigger mode is on, frame rate is enable)
-FrameRate: 10.0
-
 

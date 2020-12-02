@@ -4,22 +4,18 @@
 # Camera Parameters. Adjust them!
 #--------------------------------------------------------------------------------------------
 
-SerialNumber: "00F00964437"
+SerialNumber: "00F00964434"
 
-# Ros topic name
-TopicName: "left_camera/image"
-
+TopicName: "right_camera/image"
 # Exposure Auto, 0 stands for Off, 1 stands for Once, 2 stands for Continues
 ExposureAuto: 2
 AutoExposureTimeLower: 65
 AutoExposureTimeUpper: 10000
 # Gain Auto, 0 stands for Off, 1 stands for Once, 2 stands for Continues
-GainAuto: 2
+GainAuto: 0
 
 # Gamma Selector, 0 stands for user, 1 stands for sRGB
 GammaSelector: 1
 
-# Frame Rate (if trigger mode is on, frame rate is enable)
-FrameRate: 10.0
 
 
