@@ -6,6 +6,8 @@
 
 SerialNumber: "00F00964437"
 
+CameraName: "leftCamera"
+
 # Ros topic name
 TopicName: "left_camera/image"
 

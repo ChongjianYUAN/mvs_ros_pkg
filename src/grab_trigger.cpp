@@ -15,6 +15,7 @@ bool exit_flag = false;
 image_transport::Publisher pub;
 std::string ExposureAutoStr[3] = {"Off", "Once", "Continues"};
 std::string GainAutoStr[3] = {"Off", "Once", "Continues"};
+std::string CameraName;
 
 void setParams(void *handle, const std::string &params_file) {
   cv::FileStorage Params(params_file, cv::FileStorage::READ);
@@ -99,8 +100,11 @@ static void *WorkThread(void *pUser) {
         MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 1000);
     if (nRet == MV_OK) {
       ros::Time rcv_time = ros::Time::now();
-      printf("GetOneFrame, Width[%d], Height[%d], nFrameNum[%d]\n",
-             stImageInfo.nWidth, stImageInfo.nHeight, stImageInfo.nFrameNum);
+      std::string debug_msg;
+      debug_msg = CameraName + " GetOneFrame,nFrameNum[" +
+                  std::to_string(stImageInfo.nFrameNum) + "], FrameTime:" +
+                  std::to_string(rcv_time.toSec());
+      ROS_INFO_STREAM(debug_msg.c_str());
       cv::Mat srcImage;
       srcImage =
           cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, pData);
@@ -138,6 +142,8 @@ int main(int argc, char **argv) {
   }
   std::string expect_serial_number = Params["SerialNumber"];
   std::string pub_topic = Params["TopicName"];
+  std::string camera_name = Params["CameraName"];
+  CameraName = camera_name;
   pub = it.advertise(pub_topic, 1);
 
   while (ros::ok()) {
