@@ -2,11 +2,20 @@
   <node 
     pkg="mvs_ros_pkg"
     type="grabImgWithTrigger"
-    name="mvs_camera_trigger"
+    name="left_camera"
     args="$(find mvs_ros_pkg)/config/left_camera_trigger.yaml"
     respawn="true"
     output="screen"
   />
+    <node 
+    pkg="mvs_ros_pkg"
+    type="grabImgWithTrigger"
+    name="right_camera"
+    args="$(find mvs_ros_pkg)/config/right_camera_trigger.yaml"
+    respawn="true"
+    output="screen"
+  />
+
   <node 
     pkg="rviz"
     type="rviz"

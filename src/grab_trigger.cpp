@@ -98,6 +98,7 @@ static void *WorkThread(void *pUser) {
     nRet =
         MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 1000);
     if (nRet == MV_OK) {
+      ros::Time rcv_time = ros::Time::now();
       printf("GetOneFrame, Width[%d], Height[%d], nFrameNum[%d]\n",
              stImageInfo.nWidth, stImageInfo.nHeight, stImageInfo.nFrameNum);
       cv::Mat srcImage;
@@ -105,6 +106,7 @@ static void *WorkThread(void *pUser) {
           cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, pData);
       sensor_msgs::ImagePtr msg =
           cv_bridge::CvImage(std_msgs::Header(), "bgr8", srcImage).toImageMsg();
+      msg->header.stamp = rcv_time;
       pub.publish(msg);
     }
 
