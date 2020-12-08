@@ -2,17 +2,22 @@
 #include <fstream>
 #include <string>
 
-#include <sensor_msgs/Image.h>
-#include <Eigen/Eigen>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <ros/ros.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
+
+#include "CustomMsg.h"
+#include "common.h"
 
 using namespace std;
 using namespace Eigen;
 double secs_init, nsecs_init, last_time;
 bool is_init = false;
-string bag_path, write_path, topic_name;
+string bag_path, write_path;
 
 void loadAndSavePointcloud() 
 {
@@ -37,16 +42,16 @@ void loadAndSavePointcloud()
         return;
     }
     vector<string> types;
-    types.push_back(topic_name);
-    rosbag::View view(bag, rosbag::TopicQuery(types));
+    types.push_back(string("livox_ros_driver/CustomMsg")); 
+    rosbag::View view(bag, rosbag::TypeQuery(types));
     ofstream file_w;
     file_w.open(write_path, std::ofstream::trunc);
     for (const rosbag::MessageInstance& m : view)
     {
-        auto msg = *(m.instantiate<sensor_msgs::Image>()); // message type
+        auto msg = *(m.instantiate<livox_ros_driver::CustomMsg>()); // message type
         double secs = msg.header.stamp.sec;
         double nsecs = msg.header.stamp.nsec;
-        double inc = 100;
+        double inc;
         if (!is_init)
         {
             secs_init = secs;
@@ -71,13 +76,12 @@ void loadAndSavePointcloud()
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "parse_img_time");
+    ros::init(argc, argv, "parse_type");
     ros::NodeHandle nh("~");
-
+    
     nh.getParam("bag_path", bag_path);
     nh.getParam("write_path", write_path);
-    nh.getParam("topic_name", topic_name);
-    
+
     loadAndSavePointcloud();
     
     ros::Rate loop_rate(1);

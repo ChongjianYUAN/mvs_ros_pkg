@@ -35,8 +35,8 @@ link_directories(
 add_executable(grabImg src/grab.cpp)
 add_executable(grabImgWithTrigger src/grab_trigger.cpp)
 add_executable(Trigger_Image src/Trigger_Image.cpp)
-add_executable(parse_lidar_time src/parse_lidar_time.cpp)
-add_executable(parse_img_time src/parse_img_time.cpp)
+add_executable(parse_type_time src/parse_type.cpp)
+add_executable(parse_topic_time src/parse_topic.cpp)
 
 target_link_libraries(
   grabImg
@@ -61,5 +61,5 @@ target_link_libraries(
   -lpthread
 )
 
-target_link_libraries(parse_lidar_time ${catkin_LIBRARIES} ${PCL_LIBRARIES})
-target_link_libraries(parse_img_time ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(parse_type_time ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(parse_topic_time ${catkin_LIBRARIES} ${PCL_LIBRARIES})

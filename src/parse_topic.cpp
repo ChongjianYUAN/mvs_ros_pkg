@@ -2,51 +2,20 @@
 #include <fstream>
 #include <string>
 
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#include <pcl_conversions/pcl_conversions.h>
+#include <sensor_msgs/Image.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <Eigen/Eigen>
 #include <ros/ros.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 
-#include "CustomMsg.h"
-#include "common.h"
-
 using namespace std;
 using namespace Eigen;
 double secs_init, nsecs_init, last_time;
-bool is_init = false;
-string bag_path, write_path;
+bool is_img, is_init = false;
+string bag_path, write_path, topic_name;
 
-void lidar_callback(const sensor_msgs::PointCloud2ConstPtr& msg)
-{
-    double secs = msg->header.stamp.sec;
-    double nsecs = msg->header.stamp.nsec;
-    double inc;
-    ofstream file_w;
-    file_w.open(write_path, std::ofstream::app);
-    if (!is_init)
-    {
-        secs_init = secs;
-        nsecs_init = nsecs;
-        is_init = true;
-        secs -= secs_init;
-        nsecs -= nsecs_init;
-        last_time = secs + nsecs * 1e-9;
-    }
-    else
-    {
-        secs -= secs_init;
-        nsecs -= nsecs_init;
-        inc = secs + nsecs * 1e-9 - last_time;
-        last_time = secs + nsecs * 1e-9;
-        file_w << inc*1e3 << "\n";
-    }
-    file_w.close();
-}
-
-void loadAndSavePointcloud() 
+void parse_time() 
 {
     fstream file_;
     file_.open(bag_path, ios::in);
@@ -68,17 +37,31 @@ void loadAndSavePointcloud()
         ROS_ERROR_STREAM("LOADING BAG FAILED: " << e.what());
         return;
     }
-    vector<string> types;
-    types.push_back(string("livox_ros_driver/CustomMsg")); 
-    rosbag::View view(bag, rosbag::TypeQuery(types));
+
+    vector<string> topics;
+    if (is_img)
+        topics.push_back(topic_name);
+    else
+        topics.push_back(string("/livox/lidar"));
+    rosbag::View view(bag, rosbag::TopicQuery(topics));
     ofstream file_w;
     file_w.open(write_path, std::ofstream::trunc);
     for (const rosbag::MessageInstance& m : view)
     {
-        auto msg = *(m.instantiate<livox_ros_driver::CustomMsg>()); // message type
-        double secs = msg.header.stamp.sec;
-        double nsecs = msg.header.stamp.nsec;
-        double inc;
+        double secs, nsecs, inc;
+        if (is_img)
+        {
+            auto msg = *(m.instantiate<sensor_msgs::Image>());
+            secs = msg.header.stamp.sec;
+            nsecs = msg.header.stamp.nsec;
+        }
+        else
+        {
+            auto msg = *(m.instantiate<sensor_msgs::PointCloud2>());
+            secs = msg.header.stamp.sec;
+            nsecs = msg.header.stamp.nsec;
+        }
+
         if (!is_init)
         {
             secs_init = secs;
@@ -103,14 +86,15 @@ void loadAndSavePointcloud()
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "parse_lidar_time");
+    ros::init(argc, argv, "parse_topic");
     ros::NodeHandle nh("~");
-    // ros::Subscriber sub_pc = nh.subscribe<sensor_msgs::PointCloud2>("/livox/lidar", 10000, lidar_callback);
-    
+
     nh.getParam("bag_path", bag_path);
     nh.getParam("write_path", write_path);
-
-    loadAndSavePointcloud();
+    nh.getParam("topic_name", topic_name);
+    nh.getParam("is_img_topic", is_img);
+    
+    parse_time();
     
     ros::Rate loop_rate(1);
     while (ros::ok())

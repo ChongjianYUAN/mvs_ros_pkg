@@ -1,8 +1,0 @@
-<launch>
-
-    <node pkg="mvs_ros_pkg" type="parse_lidar_time" name="parse_lidar_time" output="screen">
-        <param name="bag_path" type="string" value="/home/sam/1206/with_all.bag"/>
-        <param name="write_path" type="string" value="$(find mvs_ros_pkg)/data/inc_time"/>
-    </node>
-
-</launch>
