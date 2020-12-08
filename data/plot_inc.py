@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import tkinter
 with open('inc_time', 'r') as f:
     lines = f.readlines()
     x = [float(line.split()[0]) for line in lines]

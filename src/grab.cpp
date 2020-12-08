@@ -214,6 +214,7 @@ int main(int argc, char **argv) {
           cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, pData);
       sensor_msgs::ImagePtr msg =
           cv_bridge::CvImage(std_msgs::Header(), "bgr8", srcImage).toImageMsg();
+      msg->header.stamp = ros::Time::now();
       pub.publish(msg);
       ros::spinOnce();
       loop_rate.sleep();
