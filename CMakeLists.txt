@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(mvs_ros_pkg)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-add_compile_options(-std=c++11)
+add_compile_options(-std=c++14)
 
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
@@ -11,8 +11,10 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   sensor_msgs
   std_msgs
+  rosbag
 )
 find_package(OpenCV)
+find_package(PCL REQUIRED)
 
 catkin_package(
  CATKIN_DEPENDS roscpp rospy std_msgs
@@ -22,6 +24,7 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
 )
 
 link_directories(
@@ -32,6 +35,8 @@ link_directories(
 add_executable(grabImg src/grab.cpp)
 add_executable(grabImgWithTrigger src/grab_trigger.cpp)
 add_executable(Trigger_Image src/Trigger_Image.cpp)
+add_executable(parse_lidar_time src/parse_lidar_time.cpp)
+add_executable(parse_img_time src/parse_img_time.cpp)
 
 target_link_libraries(
   grabImg
@@ -55,3 +60,6 @@ target_link_libraries(
   -lMvCameraControl
   -lpthread
 )
+
+target_link_libraries(parse_lidar_time ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(parse_img_time ${catkin_LIBRARIES} ${PCL_LIBRARIES})

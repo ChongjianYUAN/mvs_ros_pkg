@@ -1,0 +1,9 @@
+<launch>
+
+    <node pkg="mvs_ros_pkg" type="parse_img_time" name="parse_img_time" output="screen">
+        <param name="bag_path" type="string" value="/home/sam/1206/with_all.bag"/>
+        <param name="write_path" type="string" value="$(find mvs_ros_pkg)/data/inc_time"/>
+        <param name="topic_name" type="string" value="/left_camera/image"/>
+    </node>
+
+</launch>
