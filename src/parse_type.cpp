@@ -83,11 +83,4 @@ int main(int argc, char** argv)
     nh.getParam("write_path", write_path);
 
     loadAndSavePointcloud();
-    
-    ros::Rate loop_rate(1);
-    while (ros::ok())
-    {
-        ros::spinOnce();
-        loop_rate.sleep();
-    }
 }

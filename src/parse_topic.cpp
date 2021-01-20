@@ -95,11 +95,4 @@ int main(int argc, char** argv)
     nh.getParam("is_img_topic", is_img);
     
     parse_time();
-    
-    ros::Rate loop_rate(1);
-    while (ros::ok())
-    {
-        ros::spinOnce();
-        loop_rate.sleep();
-    }
 }
